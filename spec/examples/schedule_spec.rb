@@ -1,3 +1,4 @@
+require 'active_support/time'
 require File.dirname(__FILE__) + '/../spec_helper'
 
 describe IceCube::Schedule do
@@ -401,8 +402,8 @@ describe IceCube::Schedule do
       t0 = Time.utc(2013, 5, 18, 12, 34)
       schedule = IceCube::Schedule.new(t0)
       schedule.add_recurrence_rule IceCube::Rule.daily
-      previous = schedule.previous_occurrence(t0 + 2 * ONE_DAY)
-      previous.should == t0 + ONE_DAY
+      previous = schedule.previous_occurrence(t0 + 2 * IceCube::ONE_DAY)
+      previous.should == t0 + IceCube::ONE_DAY
     end
 
     it 'returns nil given the start time' do
@@ -421,16 +422,16 @@ describe IceCube::Schedule do
       t0 = Time.utc(2013, 5, 18, 12, 34)
       schedule = IceCube::Schedule.new(t0)
       schedule.add_recurrence_rule IceCube::Rule.daily
-      previous = schedule.previous_occurrences(2, t0 + 3 * ONE_DAY)
-      previous.should == [t0 + ONE_DAY, t0 + 2 * ONE_DAY]
+      previous = schedule.previous_occurrences(2, t0 + 3 * IceCube::ONE_DAY)
+      previous.should == [t0 + IceCube::ONE_DAY, t0 + 2 * IceCube::ONE_DAY]
     end
 
     it 'limits the returned occurrences to a given count' do
       t0 = Time.utc(2013, 5, 18, 12, 34)
       schedule = IceCube::Schedule.new(t0)
       schedule.add_recurrence_rule IceCube::Rule.daily
-      previous = schedule.previous_occurrences(999, t0 + 2 * ONE_DAY)
-      previous.should == [t0, t0 + ONE_DAY]
+      previous = schedule.previous_occurrences(999, t0 + 2 * IceCube::ONE_DAY)
+      previous.should == [t0, t0 + IceCube::ONE_DAY]
     end
 
     it 'returns empty array given the start time' do
@@ -458,7 +459,7 @@ describe IceCube::Schedule do
       t1 = Time.utc(2013, 5, 31, 12, 34)
       schedule = IceCube::Schedule.new(t0)
       schedule.add_recurrence_rule IceCube::Rule.daily.until(t1 + 1)
-      schedule.last(2).should == [t1 - ONE_DAY, t1]
+      schedule.last(2).should == [t1 - IceCube::ONE_DAY, t1]
     end
 
     it 'raises an error for a non-terminating schedule' do
@@ -651,6 +652,74 @@ describe IceCube::Schedule do
       end
     end
 
+    describe :occurs_uninterrupted_between? do
+
+      it 'is true if a schedule has one uninterrupted occurrence, which is as long as a given timerange' do
+        schedule = IceCube::Schedule.new(start = Time.parse('6:00'), :end_time => Time.parse('6:00') + 1.day )
+        schedule.add_recurrence_rule IceCube::Rule.daily.until(Date.today + 3)
+        schedule.occurs_uninterrupted_between?(Time.parse('6:00'), Time.parse('6:00') + 1.day ).should be_true
+      end
+
+      it 'is true if a schedule occurs longer but uninterrupted in a given timerange' do
+        schedule = IceCube::Schedule.new(start = Time.parse('6:00'), :end_time => Time.parse('6:00') + 1.day )
+        schedule.add_recurrence_rule IceCube::Rule.daily.until(Date.today + 3)
+        schedule.occurs_uninterrupted_between?(Time.parse('9:00'), Time.parse('13:00')).should be_true
+      end
+
+      it 'is true if a schedule occurs longer and multiple times but uninterrupted in a given timerange' do
+        schedule = IceCube::Schedule.new(start = Time.parse('6:00'), :end_time => Time.parse('6:00') + 1.day )
+        schedule.add_recurrence_rule IceCube::Rule.daily.until(Date.today + 5)
+        schedule.occurs_uninterrupted_between?(Time.parse('9:00'), Time.parse('13:00') + 3.days).should be_true
+      end
+
+      it 'is false if a schedule occurs only before a given timerange' do
+        schedule = IceCube::Schedule.new(start = Time.parse('6:00'), :end_time => Time.parse('6:00') + 1.day )
+        schedule.add_recurrence_rule IceCube::Rule.daily.until(Date.today + 3)
+        schedule.occurs_uninterrupted_between?(Time.parse('9:00') + 5.days, Time.parse('13:00') + 5.days).should be_false
+      end
+
+      it 'is false if a schedule occurs only after a given timerange' do
+        schedule = IceCube::Schedule.new(start = Time.parse('6:00'), :end_time => Time.parse('6:00') + 1.day )
+        schedule.add_recurrence_rule IceCube::Rule.daily.until(Date.today + 3)
+        schedule.occurs_uninterrupted_between?(Time.parse('9:00') - 2.days, Time.parse('13:00') - 2.days).should be_false
+      end
+
+      it 'is false if a schedule occurs before and after a given timerange' do
+        schedule = IceCube::Schedule.new(start = Time.parse('6:00'), :end_time => Time.parse('6:00') + 1.day )
+        schedule.occurs_uninterrupted_between?(Time.parse('9:00') + 3.days, Time.parse('13:00') + 3.days).should be_false
+      end
+
+      it 'is false if a schedule occurs inbetween but interrupted in a given timerange' do
+        schedule = IceCube::Schedule.new(start = Time.parse('6:00'), :end_time => Time.parse('6:00') + 1.day )
+        schedule.add_recurrence_rule IceCube::Rule.daily.until(Date.today)
+        schedule.occurs_uninterrupted_between?(Time.parse('5:00'), Time.parse('13:00') + 1.day ).should be_false
+      end
+
+      it 'is false if a schedule occurs before and inbetween but not uninterrupted in a given timerange' do
+        schedule = IceCube::Schedule.new(start = schedule_start = Time.parse('6:00'), :end_time => Time.parse('6:00') + 1.day )
+        schedule.occurs_uninterrupted_between?(Time.parse('9:00'), Time.parse('13:00') + 1.day).should be_false
+      end
+
+      it 'is false if a schedule occurs inbetween and later then a given timerange' do
+        schedule = IceCube::Schedule.new(start = Time.parse('6:00'), :end_time => Time.parse('6:00') + 1.day )
+        schedule.add_recurrence_rule IceCube::Rule.daily.until(Date.today)
+        schedule.occurs_uninterrupted_between?(Time.parse('9:00'), Time.parse('13:00') + 1.day ).should be_false
+      end
+
+      it 'is false if a schedule occurs at the start and at the end, but not inbetween a given timerange' do
+        schedule = IceCube::Schedule.new(start = Time.parse('6:00'), :end_time => Time.parse('5:00') + 1.day )
+        schedule.add_recurrence_rule IceCube::Rule.daily.until(Date.today + 5)
+        schedule.occurs_uninterrupted_between?(Time.parse('9:00'), Time.parse('13:00') + 3.days).should be_false
+      end
+
+      it 'is false if a schedule occurs multiple times but not uninterrupted in a given timerange' do
+        schedule = IceCube::Schedule.new(start = Time.parse('6:00'), :end_time => Time.parse('5:00') + 1.day )
+        schedule.add_recurrence_rule IceCube::Rule.daily.until(Date.today + 3)
+        schedule.occurs_uninterrupted_between?(Time.parse('5:00'), Time.parse('13:00') + 5.days).should be_false
+      end
+
+    end
+
     shared_examples :occurs_on? do
       context 'starting from a UTC Time' do
         let(:start_time) { Time.utc(2010, 7, 2, 10, 0, 0) }
@@ -698,7 +767,6 @@ describe IceCube::Schedule do
       schedule.occurs_on?(Date.new(2010, 7, 12)).should be_true
       schedule.occurs_on?(Date.new(2010, 7, 13)).should be_true
     end
-
   end
 
   def compare_time_zone_info(start_time)

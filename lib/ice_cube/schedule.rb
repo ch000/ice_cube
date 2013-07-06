@@ -341,6 +341,24 @@ module IceCube
       data
     end
 
+    # Returns true if a given timerange is completly covered with occurrences.
+    # Checks if the occurrences in the timerange are as long as the timerange itself.
+    #         start_time        end_time
+    #         |                 |
+    #         #   occurrence    #         => true
+    #    #        occurrence         #    => true
+    #    #  occurrence # occurrence  #    => true
+    #         #  oc # oc  # oc  #         => true
+    #         |                 |
+    def occurs_uninterrupted_between?(start_time, end_time)
+      return false if occurrences_between(start_time - duration, end_time).count == 0
+      occurrence_length = occurrences_between(start_time - duration, end_time).count * duration
+      delta1 = (start_time.to_i - occurrences_between(start_time - duration, end_time).first.start_time.to_i )
+      delta2 = (occurrences_between(start_time - duration, end_time).last.end_time.to_i - end_time.to_i)
+      return false if delta1 < 0 || delta2 < 0
+      (occurrence_length - delta1 - delta2) == (end_time-start_time)
+    end
+
     # Load the schedule from a hash
     def self.from_hash(original_hash, options = {})
       original_hash[:start_date] = options[:start_date_override] if options[:start_date_override]
